@@ -251,15 +251,35 @@ document.getElementById("slideshow").addEventListener("click", (e) => {
     }
 });
 // También permitimos que en teléfono se pase con un simple toque
-document.getElementById("slideshow").addEventListener("touchstart", (e) => {
-    const touchX = e.touches[0].clientX;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = touchX - rect.left;
+// Control unificado para el Slideshow (Evita el salto doble en móvil)
+const slideshow = document.getElementById("slideshow");
 
-    if (x > rect.width / 2) moveSlide(1);
-    else moveSlide(-1);
-});
+function handleInteraction(clientX) {
+    // 1. Efecto visual de texto
+    spawnLoveText(clientX, window.innerHeight / 2);
 
+    // 2. Lógica de las fotos
+    const rect = slideshow.getBoundingClientRect();
+    const x = clientX - rect.left;
+
+    if (x > rect.width / 2) {
+        moveSlide(1);  // Avanzar
+    } else {
+        moveSlide(-1); // Retroceder
+    }
+}
+
+// Detectamos si es móvil o PC y aplicamos solo un evento
+if ('ontouchstart' in window) {
+    slideshow.addEventListener("touchstart", (e) => {
+        // e.preventDefault(); // Opcional: evita el scroll mientras tocas las fotos
+        handleInteraction(e.touches[0].clientX);
+    }, {passive: false});
+} else {
+    slideshow.addEventListener("click", (e) => {
+        handleInteraction(e.clientX);
+    });
+}
 // Interacciones
 overlay.addEventListener("click", () => {
     overlay.style.display = "none";
