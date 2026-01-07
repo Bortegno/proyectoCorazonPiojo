@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Para Piojito 💜</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: Arial, sans-serif; }
+    canvas { position: absolute; inset: 0; z-index: 1; touch-action: none; }
+    
+    /* PANTALLA INICIAL */
+    #overlay {
+        position: fixed; inset: 0; background: black; z-index: 100;
+        display: flex; flex-direction: column; justify-content: center; align-items: center;
+        color: #c77dff; cursor: pointer; text-align: center;
+    }
+
+    #hint {
+    position: absolute;
+    top: 10%;
+    width: 100%;
+    text-align: center;
+    z-index: 5;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px; /* Espacio entre el saludo y la instrucción */
+    }
+
+.birthday-style {
+    color: #e6ccff;
+    font-size: 16px; /* Tamaño exacto que pediste */
+    font-weight: bold;
+    text-shadow: 0 0 10px #c77dff, 0 0 20px #c77dff; /* El mismo brillo neón */
+    letter-spacing: 1px;
+}
+
+.instruction-text {
+    color: #e6ccff;
+    font-size: 13px;
+    opacity: 0.7; /* Un poco más suave para que resalte el cumple */
+    text-shadow: 0 0 5px #c77dff;
+}
+    #loader {
+        position: absolute; top: 18%; left: 50%; transform: translateX(-50%);
+        width: 200px; height: 6px; background: rgba(255,255,255,.1);
+        border-radius: 10px; display: none; z-index: 10; overflow: hidden;
+    }
+    #loader span { display: block; height: 100%; width: 0%; background: #c77dff; box-shadow: 0 0 15px #c77dff; }
+
+    /* VISOR DE FOTOS AUTOMÁTICO */
+   /* VISOR DE FOTOS INTERACTIVO */
+    #gallery {
+        position: fixed; inset: 0; display: none; background: rgba(0,0,0,0.95);
+        backdrop-filter: blur(15px); z-index: 100; flex-direction: column;
+        justify-content: center; align-items: center;
+    }
+    .photo-display {
+        width: 85vw; height: 65vh; max-width: 400px; position: relative;
+        border: 2px solid #c77dff; border-radius: 20px; overflow: hidden;
+        box-shadow: 0 0 30px rgba(199, 125, 255, 0.4);
+        cursor: pointer;
+    }
+    .photo-display img {
+        position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+        opacity: 0; transition: opacity 0.5s ease; pointer-events: none;
+    }
+    .photo-display img.active { opacity: 1; }
+
+    /* Indicador de ayuda */
+    .tap-hint {
+        color: #c77dff; font-size: 14px; margin-top: 15px; opacity: 0.8;
+    }
+    #close { margin-top: 30px; padding: 12px 40px; background: #c77dff; color: white; border-radius: 25px; cursor: pointer; font-weight: bold; }
+
+    .loveText {
+    position: fixed;
+    color: #e6ccff;
+    font-size: 16px; /* Lo bajamos también a 16px como pediste antes */
+    font-weight: bold;
+    text-shadow: 0 0 10px #c77dff, 0 0 20px #c77dff;
+    pointer-events: none;
+    z-index: 1000;
+    animation: fade 2s forwards;
+}
+
+@keyframes fade {
+    0% {
+        opacity: 0;
+        transform: translateY(0) scale(0.5);
+    }
+    20% {
+        opacity: 1;
+        transform: translateY(-20px) scale(1.2);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-100px) scale(1.5);
+    }
+}
+</style>
+</head>
+<body>
+
+<div id="overlay">
+    <h1>Para alguien especial 💜</h1>
+    <p>Toca para comenzar</p>
+</div>
+
+<div id="hint">
+    <div class="birthday-style">Feliz cumpleaños Piojito</div>
+    <div class="instruction-text">Mantén presionado el corazón 💜</div>
+</div>
+<div id="loader"><span></span></div>
+<canvas id="c"></canvas>
+
+<div id="gallery">
+    <h2 style="color: #e6ccff; margin-bottom: 10px;">Nuestros Momentos ✨</h2>
+    <div class="photo-display" id="slideshow">
+        <img src="foto1.jpeg" class="active">
+        <img src="foto2.jpeg">
+        <img src="foto3.jpeg">
+        <img src="foto4.jpeg">
+        <img src="foto5.jpeg">
+        <img src="foto6.jpeg">
+    </div>
+    <p class="tap-hint">← Toca para retroceder | Toca para avanzar →</p>
+    <div id="close">Regresar</div>
+</div>
+
+<audio id="music" src="musica.mp3" loop></audio>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+const music = document.getElementById("music");
+const overlay = document.getElementById("overlay");
+const loader = document.getElementById("loader");
+const loaderBar = loader.querySelector("span");
+const gallery = document.getElementById("gallery");
+
+let musicStarted = false;
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+// Ecuación matemática del corazón
+function getHeartPoint(t, scale) {
+    return {
+        x: 16 * Math.pow(Math.sin(t), 3) * scale,
+        y: -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)) * scale
+    };
+}
+
+class Particle {
+    constructor(type) {
+        this.type = type; // "flow" (corazón a corazón) o "ray" (rayos salientes)
+        this.reset();
+    }
+
+    reset() {
+        this.t = Math.random() * Math.PI * 2;
+        const scaleBase = Math.min(innerWidth, innerHeight) / 30;
+        
+        if (this.type === "flow") {
+            const start = getHeartPoint(this.t, scaleBase);
+            const target = getHeartPoint(this.t, scaleBase * 0.35);
+            this.x = start.x;
+            this.y = start.y;
+            this.tx = target.x;
+            this.ty = target.y;
+            this.size = Math.random() * 2 + 1;
+            this.speed = 0.02 + Math.random() * 0.02;
+            this.color = "#c77dff";
+        } else {
+            const start = getHeartPoint(this.t, scaleBase);
+            this.x = start.x;
+            this.y = start.y;
+            const angle = Math.atan2(this.y, this.x);
+            const mag = 2 + Math.random() * 5;
+            this.vx = Math.cos(angle) * mag;
+            this.vy = Math.sin(angle) * mag;
+            this.life = 1;
+            this.size = Math.random() * 1.5;
+            this.color = "rgba(230, 179, 255, 0.6)";
+        }
+    }
+
+    update() {
+        if (this.type === "flow") {
+            this.x += (this.tx - this.x) * this.speed;
+            this.y += (this.ty - this.y) * this.speed;
+            if (Math.abs(this.x - this.tx) < 1) this.reset();
+        } else {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.life -= 0.015;
+            if (this.life <= 0) this.reset();
+        }
+    }
+
+    draw() {
+        ctx.fillStyle = this.color;
+        if(this.type === "ray") ctx.globalAlpha = this.life;
+        ctx.beginPath();
+        ctx.arc(canvas.width/2 + this.x, canvas.height/2 + this.y, this.size, 0, Math.PI*2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+}
+
+const particles = [];
+for(let i=0; i<1000; i++) particles.push(new Particle("flow"));
+for(let i=0; i<400; i++) particles.push(new Particle("ray"));
+
+function animate() {
+    ctx.fillStyle = "rgba(0,0,0,0.15)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => { p.update(); p.draw(); });
+    requestAnimationFrame(animate);
+}
+
+// Control del Slideshow Automático
+let slideIndex = 0;
+const images = document.querySelectorAll("#slideshow img");
+
+// Función para cambiar de foto manualmente
+function moveSlide(step) {
+    images[slideIndex].classList.remove("active");
+    slideIndex = (slideIndex + step + images.length) % images.length;
+    images[slideIndex].classList.add("active");
+}
+
+// Evento para detectar clic en las fotos y TAMBIÉN crear el texto
+document.getElementById("slideshow").addEventListener("click", (e) => {
+    // 1. Creamos el texto "I Love You" en la posición del clic
+    spawnLoveText(e.clientX, e.clientY);
+
+    // 2. Lógica de pasar fotos
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+
+    if (x > rect.width / 2) {
+        moveSlide(1);  // Derecha
+    } else {
+        moveSlide(-1); // Izquierda
+    }
+});
+// También permitimos que en teléfono se pase con un simple toque
+document.getElementById("slideshow").addEventListener("touchstart", (e) => {
+    const touchX = e.touches[0].clientX;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = touchX - rect.left;
+
+    if (x > rect.width / 2) moveSlide(1);
+    else moveSlide(-1);
+});
+
+// Interacciones
+overlay.addEventListener("click", () => {
+    overlay.style.display = "none";
+    music.play();
+    animate();
+});
+
+let pressTimer, progress = 0;
+const startPress = (e) => {
+    loader.style.display = "block";
+    progress = 0;
+    pressTimer = setInterval(() => {
+        progress += 2;
+        loaderBar.style.width = progress + "%";
+        if(progress >= 100) {
+            clearInterval(pressTimer);
+            gallery.style.display = "flex";
+            loader.style.display = "none";
+            startSlideshow();
+        }
+    }, 20);
+};
+
+const endPress = () => {
+    clearInterval(pressTimer);
+    loader.style.display = "none";
+    loaderBar.style.width = "0%";
+};
+
+canvas.addEventListener("mousedown", startPress);
+window.addEventListener("mouseup", endPress);
+canvas.addEventListener("touchstart", (e) => { e.preventDefault(); startPress(); });
+window.addEventListener("touchend", endPress);
+
+document.getElementById("close").onclick = () => {
+    gallery.style.display = "none";
+    clearInterval(slideTimer);
+};
+function spawnLoveText(x, y) {
+    const t = document.createElement("div");
+    t.className = "loveText";
+    t.style.left = x + "px";
+    t.style.top = y + "px";
+    t.style.position = "fixed"; // Importante para que salga sobre todo
+    t.style.zIndex = "1000";    // Un número muy alto para que nada lo tape
+    t.innerHTML = "Feliz cumpleaños 💜";
+    document.body.appendChild(t);
+    
+    setTimeout(() => t.remove(), 2000);
+}
+
+// Esto asegura que si haces clic fuera de las fotos (en el corazón), también salga
+canvas.addEventListener("click", (e) => {
+    spawnLoveText(e.clientX, e.clientY);
+});
+</script>
+</body>
+</html>
