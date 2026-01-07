@@ -7,7 +7,7 @@
 <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: Arial, sans-serif; }
     canvas { position: absolute; inset: 0; z-index: 1; touch-action: none; }
-    
+     
     /* PANTALLA INICIAL */
     #overlay {
         position: fixed; inset: 0; background: black; z-index: 100;
@@ -268,7 +268,7 @@ overlay.addEventListener("click", () => {
 });
 
 let pressTimer, progress = 0;
-const startPress = (e) => {
+const startPress = () => {
     loader.style.display = "block";
     progress = 0;
     pressTimer = setInterval(() => {
@@ -289,9 +289,22 @@ const endPress = () => {
     loaderBar.style.width = "0%";
 };
 
-canvas.addEventListener("mousedown", startPress);
+// Para Computadora
+canvas.addEventListener("mousedown", (e) => {
+    startPress();
+    spawnLoveText(e.clientX, e.clientY);
+});
+
 window.addEventListener("mouseup", endPress);
-canvas.addEventListener("touchstart", (e) => { e.preventDefault(); startPress(); });
+
+// Para Teléfono (Corregido)
+canvas.addEventListener("touchstart", (e) => {
+    // No usamos preventDefault aquí para permitir que el toque se registre
+    const touch = e.touches[0];
+    startPress();
+    spawnLoveText(touch.clientX, touch.clientY);
+});
+
 window.addEventListener("touchend", endPress);
 
 document.getElementById("close").onclick = () => {
@@ -301,10 +314,10 @@ document.getElementById("close").onclick = () => {
 function spawnLoveText(x, y) {
     const t = document.createElement("div");
     t.className = "loveText";
-    t.style.left = x + "px";
-    t.style.top = y + "px";
-    t.style.position = "fixed"; // Importante para que salga sobre todo
-    t.style.zIndex = "1000";    // Un número muy alto para que nada lo tape
+    t.style.left = (x - 50) + "px"; // Centrado horizontal
+    t.style.top = (y - 20) + "px";  // Un poco arriba del dedo
+    t.style.position = "fixed";
+    t.style.zIndex = "2000";       // Súper alto
     t.innerHTML = "Feliz cumpleaños 💜";
     document.body.appendChild(t);
     
