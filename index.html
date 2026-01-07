@@ -236,30 +236,20 @@ function moveSlide(step) {
 }
 
 // Evento para detectar clic en las fotos y TAMBIÉN crear el texto
-document.getElementById("slideshow").addEventListener("click", (e) => {
-    // 1. Creamos el texto "I Love You" en la posición del clic
-    spawnLoveText(e.clientX, e.clientY);
 
-    // 2. Lógica de pasar fotos
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
 
-    if (x > rect.width / 2) {
-        moveSlide(1);  // Derecha
-    } else {
-        moveSlide(-1); // Izquierda
-    }
-});
-// También permitimos que en teléfono se pase con un simple toque
-// Control unificado para el Slideshow (Evita el salto doble en móvil)
-const slideshow = document.getElementById("slideshow");
+let isProcessing = false;
+const slideshowElement = document.getElementById("slideshow");
 
-function handleInteraction(clientX) {
+function handlePhotoChange(clientX, clientY) {
+    if (isProcessing) return; // Si ya está cambiando, ignora el segundo toque rápido
+    isProcessing = true;
+
     // 1. Efecto visual de texto
-    spawnLoveText(clientX, window.innerHeight / 2);
+    spawnLoveText(clientX, clientY);
 
     // 2. Lógica de las fotos
-    const rect = slideshow.getBoundingClientRect();
+    const rect = slideshowElement.getBoundingClientRect();
     const x = clientX - rect.left;
 
     if (x > rect.width / 2) {
@@ -267,19 +257,27 @@ function handleInteraction(clientX) {
     } else {
         moveSlide(-1); // Retroceder
     }
+
+    // Bloqueamos cambios por 400ms para evitar saltos accidentales
+    setTimeout(() => { isProcessing = false; }, 400);
 }
 
-// Detectamos si es móvil o PC y aplicamos solo un evento
-if ('ontouchstart' in window) {
-    slideshow.addEventListener("touchstart", (e) => {
-        // e.preventDefault(); // Opcional: evita el scroll mientras tocas las fotos
-        handleInteraction(e.touches[0].clientX);
-    }, {passive: false});
+// Control Inteligente: Detecta si es táctil o mouse
+if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+    // Solo para celulares/tablets
+    slideshowElement.addEventListener("touchstart", (e) => {
+        e.preventDefault(); // Evita que el navegador simule un "click" extra
+        const touch = e.touches[0];
+        handlePhotoChange(touch.clientX, touch.clientY);
+    }, { passive: false });
 } else {
-    slideshow.addEventListener("click", (e) => {
-        handleInteraction(e.clientX);
+    // Solo para computadoras
+    slideshowElement.addEventListener("click", (e) => {
+        handlePhotoChange(e.clientX, e.clientY);
     });
 }
+
+// --- HASTA AQUÍ ---
 // Interacciones
 overlay.addEventListener("click", () => {
     overlay.style.display = "none";
